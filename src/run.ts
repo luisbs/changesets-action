@@ -100,6 +100,7 @@ type PublishOptions = {
   script: string;
   githubToken: string;
   createGithubReleases: boolean;
+  noGitTags: boolean;
   cwd?: string;
 };
 
@@ -118,6 +119,7 @@ export async function runPublish({
   script,
   githubToken,
   createGithubReleases,
+  noGitTags,
   cwd = process.cwd(),
 }: PublishOptions): Promise<PublishResult> {
   const octokit = setupOctokit(githubToken);
@@ -155,6 +157,12 @@ export async function runPublish({
       releasedPackages.push(pkg);
     }
 
+    // when `changeset publish --no-git-tags` is used
+    // the regex won't match even if the packages were published
+    if (noGitTags && releasedPackages.length === 0) {
+      packages.forEach((pkg) => releasedPackages.push(pkg));
+    }
+
     if (createGithubReleases) {
       await Promise.all(
         releasedPackages.map((pkg) =>
@@ -177,17 +185,23 @@ export async function runPublish({
 
     for (let line of changesetPublishOutput.stdout.split("\n")) {
       let match = line.match(newTagRegex);
-
       if (match) {
         releasedPackages.push(pkg);
-        if (createGithubReleases) {
-          await createRelease(octokit, {
-            pkg,
-            tagName: `v${pkg.packageJson.version}`,
-          });
-        }
         break;
       }
+    }
+
+    // when `changeset publish --no-git-tags` is used
+    // the regex won't match even if the packages were published
+    if (noGitTags && releasedPackages.length === 0) {
+      releasedPackages.push(pkg)
+    }
+
+    if (createGithubReleases) {
+      await createRelease(octokit, {
+        pkg,
+        tagName: `v${pkg.packageJson.version}`,
+      });
     }
   }
 

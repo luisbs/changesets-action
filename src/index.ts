@@ -88,6 +88,7 @@ const getOptionalInput = (name: string) => core.getInput(name) || undefined;
         script: publishScript,
         githubToken,
         createGithubReleases: core.getBooleanInput("createGithubReleases"),
+        noGitTags: core.getBooleanInput("noGitTags"),
       });
 
       if (result.published) {

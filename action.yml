@@ -28,6 +28,10 @@ inputs:
     description: "A boolean value to indicate whether to create Github releases after `publish` or not"
     required: false
     default: true
+  noGitTags:
+    description: "A boolean value to indicate whether `changeset publish --no-git-tag` was used"
+    required: false
+    default: false
   branch:
     description: Sets the branch in which the action will run. Default to `github.ref_name` if not provided
     required: false

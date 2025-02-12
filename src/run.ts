@@ -1,4 +1,4 @@
-import { exec, getExecOutput } from "@actions/exec";
+import { exec, ExecOutput, getExecOutput } from "@actions/exec";
 import { GitHub, getOctokitOptions } from "@actions/github/lib/utils";
 import * as github from "@actions/github";
 import * as core from "@actions/core";
@@ -160,7 +160,10 @@ export async function runPublish({
     // when `changeset publish --no-git-tags` is used
     // the regex won't match even if the packages were published
     if (noGitTags && releasedPackages.length === 0) {
-      packages.forEach((pkg) => releasedPackages.push(pkg));
+      for (const pkgName of extractPublishedPackages(changesetPublishOutput)) {
+        const pkg = packagesByName.get(pkgName);
+        if (pkg) releasedPackages.push(pkg);
+      }
     }
 
     if (createGithubReleases) {
@@ -194,10 +197,12 @@ export async function runPublish({
     // when `changeset publish --no-git-tags` is used
     // the regex won't match even if the packages were published
     if (noGitTags && releasedPackages.length === 0) {
-      releasedPackages.push(pkg)
+      if (extractPublishedPackages(changesetPublishOutput).length) {
+        releasedPackages.push(pkg);
+      }
     }
 
-    if (createGithubReleases) {
+    if (createGithubReleases && releasedPackages.length) {
       await createRelease(octokit, {
         pkg,
         tagName: `v${pkg.packageJson.version}`,
@@ -217,6 +222,26 @@ export async function runPublish({
 
   return { published: false };
 }
+
+const extractPublishedPackages = (changesetPublishOutput: ExecOutput) => {
+  const packageRegex = /(@[^/]+\/[^@]+|[^/]+)@([^\s]+)/;
+  let inPackages = false;
+
+  const packages: string[] = [];
+  for (const line of changesetPublishOutput.stdout.split("\n")) {
+    if (line.includes("No unpublished projects to publish")) break;
+    if (line.includes("🦋  Creating git tag...")) break;
+    if (line.includes("packages published successfully:")) {
+      inPackages = true;
+      continue;
+    }
+    if (!inPackages) continue;
+
+    const match = line.match(packageRegex);
+    if (match !== null) packages.push(match[1]);
+  }
+  return packages;
+};
 
 const requireChangesetsCliPkgJson = (cwd: string) => {
   try {
